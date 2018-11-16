@@ -34,10 +34,5 @@
         "jakub-onderka/php-parallel-lint": "0.*",
         "fabpot/php-cs-fixer": "1.0.*@dev",
         "apigen/apigen": "~4.0"
-    },
-    "extra": {
-        "branch-alias": {
-            "dev-working": "working"
-        }
     }
 }
