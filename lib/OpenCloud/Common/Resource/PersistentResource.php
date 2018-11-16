@@ -63,6 +63,38 @@ abstract class PersistentResource extends BaseResource
     }
 
     /**
+     * Create a new resource using snapshot.
+     * @param array $params
+     * @return \Guzzle\Http\Message\Response
+     */
+    public function createFromSnapshot($params = array())
+    {
+        // set parameters
+        if (!empty($params)) {
+            $this->populate($params, false);
+        }
+
+        // construct the JSON
+        $json = json_encode($this->createJsonForSnapshot());
+        $this->checkJsonError();
+
+        $createUrl = $this->createUrl();
+
+        $response = $this->getClient()->post($createUrl, self::getJsonHeader(), $json)->send();
+
+        // We have to try to parse the response body first because it should have precedence over a Location refresh.
+        // I'd like to reverse the order, but Nova instances return ephemeral properties on creation which are not
+        // available when you follow the Location link...
+        if (null !== ($decoded = $this->parseResponse($response))) {
+            $this->populate($decoded);
+        } elseif ($location = $response->getHeader('Location')) {
+            $this->refreshFromLocationUrl($location);
+        }
+
+        return $response;
+    }
+    
+    /**
      * Update a resource
      *
      * @param array $params

@@ -214,6 +214,11 @@ class Server extends NovaResource implements HasPtrRecordsInterface
     public $user_data;
 
     /**
+     * @var type Uuid of Snapshot (for create)
+     */
+    private $snapshotUuid;
+
+    /**
      * {@inheritDoc}
      */
     protected $aliases = array(
@@ -293,6 +298,32 @@ class Server extends NovaResource implements HasPtrRecordsInterface
         }
 
         return parent::create($params);
+    }
+
+    /**
+     * Creates the Server from Snapshot.
+     * It is customized function. Not Provided by Rackspace Api platform
+     * 
+     * @author Milind
+     * @param array $params - an associative array of key/value pairs of attributes to set on the new server
+     */
+    public function createFromSnapshot($params = array()){
+        $this->id = null;
+        $this->status = null;
+
+        if (isset($params['imageId'])) {
+            $this->imageRef = $params['imageId'];
+        }
+
+        if (isset($params['flavorId'])) {
+            $this->flavorRef = $params['flavorId'];
+        }
+
+        if (isset($params["block_device_mapping_v2"][0]["uuid"])) {
+            $this->snapshotUuid = $params["block_device_mapping_v2"][0]["uuid"];
+        }
+        
+        return parent::createFromSnapshot($params);
     }
 
     /**
