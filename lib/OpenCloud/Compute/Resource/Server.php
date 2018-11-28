@@ -801,6 +801,122 @@ class Server extends NovaResource implements HasPtrRecordsInterface
         return (object) array('server' => $server);
     }
 
+    /**
+     * Creates JSON request for creating server using Snapshot.
+     */
+    protected function createJsonForSnapshot()
+    {
+        // Convert some values
+        $this->metadata->sdk = $this->getService()->getClient()->getUserAgent();
+
+        if ($this->image instanceof ImageInterface) {
+            $this->imageRef = $this->image->getId();
+        }
+        if ($this->flavor instanceof Flavor) {
+            $this->flavorRef = $this->flavor->id;
+        }
+
+        // Base object
+        $server = (object) array(
+            'name'      => $this->name,
+            'imageRef'  => $this->imageRef,
+            'flavorRef' => $this->flavorRef
+        );
+
+        if ($this->metadata->count()) {
+            $server->metadata = $this->metadata->toArray();
+        }
+
+        // Boot from Snapshot
+        $server->block_device_mapping_v2 = array();
+        $server->block_device_mapping_v2[] = (object) array(
+            'source_type' => 'snapshot',
+            'destination_type' => 'volume',
+            'uuid' => $this->snapshotUuid,
+            'boot_index' => 0,
+            'delete_on_termination' => true,
+            "volume_size" => "50"
+        );
+        
+
+        // Networks
+        if (is_array($this->networks) && count($this->networks)) {
+            $server->networks = array();
+
+            foreach ($this->networks as $network) {
+                if ($network instanceof NetworkInterface) {
+                    $server->networks[] = (object) array('uuid' => $network->getId());
+                } elseif ($network instanceof Port) {
+                    $server->networks[] = (object) array('port' => $network->getId());
+                } else {
+                    throw new Exceptions\InvalidParameterError(sprintf(
+                        'When creating a server, the "networks" key must be an ' .
+                        'array of objects which implement either OpenCloud\Networking\Resource\NetworkInterface ' .
+                        'or OpenCloud\Networking\Resource\Port. The  variable you passed in was a [%s]',
+                        gettype($network)
+                    ));
+                }
+            }
+        }
+
+        // Security groups
+        if (is_array($this->security_groups) && count($this->security_groups)) {
+            $server->security_groups = array();
+
+            foreach ($this->security_groups as $security_group) {
+                if ($security_group instanceof SecurityGroup) {
+                    $securityGroupName = $security_group->name();
+                } elseif (is_string($security_group)) {
+                    $securityGroupName = $security_group;
+                } else {
+                    throw new Exceptions\InvalidParameterError(sprintf(
+                        'When creating a server, the "security_groups" key must be an ' .
+                        'array of strings or objects of type OpenCloud\Networking\Resource\SecurityGroup;' .
+                        'variable passed in was a [%s]',
+                        gettype($security_group)
+                    ));
+                }
+                $server->security_groups[] = (object) array('name' => $securityGroupName);
+            }
+        }
+
+        // Personality files
+        if (!empty($this->personality)) {
+            $server->personality = array();
+            foreach ($this->personality as $path => $data) {
+                // Stock personality array
+                $server->personality[] = (object) array(
+                    'path'     => $path,
+                    'contents' => $data
+                );
+            }
+        }
+
+        // Keypairs
+        if (!empty($this->keypair)) {
+            if (is_string($this->keypair)) {
+                $server->key_name = $this->keypair;
+            } elseif (isset($this->keypair['name']) && is_string($this->keypair['name'])) {
+                $server->key_name = $this->keypair['name'];
+            } elseif ($this->keypair instanceof Keypair && $this->keypair->getName()) {
+                $server->key_name = $this->keypair->getName();
+            }
+        }
+
+        // Cloud-init executable
+        if (!empty($this->user_data)) {
+            $server->user_data = $this->user_data;
+        }
+
+        // Availability zone
+        if (!empty($this->availabilityZone)) {
+            $this->checkExtension('OS-EXT-AZ');
+            $server->availability_zone = $this->availabilityZone;
+        }
+
+        return (object) array('server' => $server);
+    }
+
     protected function updateJson($params = array())
     {
         return (object) array('server' => (object) $params);
